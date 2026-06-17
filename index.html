@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>智能家居云端控制台</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+         background: #f4f7fb; color: #172033; margin: 0; padding: 20px; min-height: 100vh; }
+  .container { max-width: 1180px; margin: 0 auto; }
+  h1 { margin: 0 0 8px; font-size: 26px; color: #0f172a; display: flex;
+       align-items: center; gap: 10px; flex-wrap: wrap; }
+  .subtitle { color: #64748b; margin-bottom: 24px; font-size: 13px; }
+  .pill { display: inline-block; padding: 4px 12px; border-radius: 99px;
+          font-size: 12px; font-weight: 600; margin-left: 8px; vertical-align: middle; }
+  .pill.on { background: #16a34a; color: #fff; }
+  .pill.off { background: #dc2626; color: #fff; }
+  .card { background: #ffffff; border: 1px solid #dbe4ef; border-radius: 8px;
+          padding: 22px; margin-bottom: 18px; box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06); }
+  .card h2 { margin: 0 0 16px; font-size: 17px; font-weight: 600; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+  .tile { background: #f8fafc; border-radius: 8px; padding: 18px;
+          border: 1px solid #e2e8f0; }
+  .tile.state-on { background: #ecfdf5; border-color: #22c55e;
+                   box-shadow: 0 0 0 3px rgba(34,197,94,0.16); }
+  .tile.state-off { background: #f8fafc; border-color: #cbd5e1; }
+  .tile.state-alert { background: #fef2f2; border-color: #ef4444;
+                      box-shadow: 0 0 0 3px rgba(239,68,68,0.16); }
+  .tile .icon { font-size: 26px; margin-bottom: 6px; }
+  .tile .label { font-size: 13px; color: #64748b; margin-bottom: 4px; }
+  .tile .value { font-size: 28px; font-weight: 700; color: #0f172a; }
+  .tile .unit { font-size: 15px; color: #64748b; font-weight: 400; margin-left: 4px; }
+  .controls { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .ctrl-group { background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+                border-radius: 8px; padding: 16px; min-width: 0; border: 1px solid #dbe4ef; }
+  .ctrl-group.is-on { border-color: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.16); }
+  .ctrl-group.is-off { border-color: #94a3b8; box-shadow: 0 0 0 3px rgba(100,116,139,0.12); }
+  .ctrl-group.is-pending { border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.18); }
+  .control-head { display: flex; align-items: center; justify-content: space-between;
+                  gap: 12px; margin-bottom: 12px; }
+  .ctrl-group .title { font-size: 14px; color: #334155; font-weight: 700; }
+  .control-state { flex: 0 0 auto; border-radius: 999px; padding: 4px 10px;
+                   background: #f1f5f9; color: #475569; border: 1px solid #dbe4ef;
+                   font-size: 12px; font-weight: 700; }
+  .control-state.on { background: #dcfce7; color: #166534; border-color: #86efac; }
+  .control-state.off { background: #eef2ff; color: #3730a3; border-color: #c7d2fe; }
+  .control-state.pending { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+  .btn-row { display: flex; gap: 8px; }
+  button { background: #2563eb; color: white; border: 1px solid transparent; padding: 10px 16px;
+           border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 700; flex: 1;
+           min-height: 42px; transition: transform .12s ease, border-color .12s ease, background .12s ease; }
+  button:hover { background: #1d4ed8; transform: translateY(-1px); }
+  button.btn-off { background: #475569; }
+  button.btn-off:hover { background: #334155; }
+  button.btn-on { background: #16a34a; }
+  button.btn-on:hover { background: #15803d; }
+  button.active { transform: translateY(-1px); }
+  button.btn-on.active { background: #047857; border-color: #86efac;
+                         box-shadow: 0 0 0 3px rgba(34,197,94,0.22); }
+  button.btn-off.active { background: #1e293b; border-color: #93c5fd;
+                          box-shadow: 0 0 0 3px rgba(37,99,235,0.18); }
+  button.active::after { content: " 当前"; font-size: 12px; font-weight: 800; opacity: .92; }
+  button.pending { opacity: .72; }
+  button.pending::after { content: " 等待"; font-size: 12px; font-weight: 800; opacity: .92; }
+  details summary { cursor: pointer; font-weight: 600; padding: 4px 0; color: #334155; }
+  .config-row { display: grid; grid-template-columns: 140px 1fr; gap: 12px;
+                align-items: center; margin-top: 12px; }
+  input { background: rgba(15, 23, 42, 0.8); color: #e2e8f0;
+          border: 1px solid rgba(148, 163, 184, 0.3); padding: 9px;
+          border-radius: 6px; font-size: 13px; width: 100%; }
+  #log { background: rgba(15, 23, 42, 0.9);
+         border: 1px solid rgba(148, 163, 184, 0.15);
+         padding: 14px; border-radius: 8px; height: 220px; overflow-y: auto;
+         font-family: Consolas, Monaco, monospace; font-size: 12px;
+         color: #94a3b8; line-height: 1.6; }
+  .log-time { color: #64748b; }
+  .log-rx { color: #22d3ee; }
+  .log-tx { color: #fb923c; }
+  .log-err { color: #f87171; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🏠 智能家居云端控制台<span id="connStatus" class="pill off">未连接</span></h1>
+  <div class="subtitle">公网 EMQX Broker · 手机、电脑、ESP32 不在同一 WiFi 也可实时监测和控制</div>
+
+  <div class="card">
+    <h2>📊 实时监测</h2>
+    <div class="grid">
+      <div class="tile"><div class="icon">🌡️</div><div class="label">温度</div>
+        <div class="value"><span id="vTemp">--</span><span class="unit">°C</span></div></div>
+      <div class="tile"><div class="icon">💧</div><div class="label">湿度</div>
+        <div class="value"><span id="vHum">--</span><span class="unit">%</span></div></div>
+      <div class="tile" id="tileHumAlarm"><div class="icon">⚠️</div><div class="label">湿度报警</div>
+        <div class="value" id="vHumAlarm">--</div></div>
+      <div class="tile"><div class="icon">🌱</div><div class="label">土壤湿度 raw</div>
+        <div class="value"><span id="vSoil">--</span></div></div>
+      <div class="tile" id="tileButtonSms"><div class="icon">📩</div><div class="label">门铃短信</div>
+        <div class="value" id="vButtonSms">--</div></div>
+      <div class="tile" id="tileMotion"><div class="icon">🚶</div><div class="label">人体感应</div>
+        <div class="value" id="vMotion">--</div></div>
+      <div class="tile" id="tileLight"><div class="icon">💡</div><div class="label">智能灯</div>
+        <div class="value" id="vLight">--</div></div>
+      <div class="tile" id="tileBuzzer"><div class="icon">🔔</div><div class="label">蜂鸣器</div>
+        <div class="value" id="vBuzzer">--</div></div>
+      <div class="tile" id="tileDoorbell"><div class="icon">🚪</div><div class="label">门铃</div>
+        <div class="value" id="vDoorbell">--</div></div>
+      <div class="tile" id="tileSocket"><div class="icon">🔌</div><div class="label">智能插座</div>
+        <div class="value" id="vSocket">--</div></div>
+    </div>
+    <div style="margin-top:14px; color:#94a3b8; font-size:12px;">
+      最后更新: <span id="lastUpdate">等待数据...</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📈 温湿度 / 土壤湿度曲线（最近 2 分钟）</h2>
+    <div style="height: 260px;">
+      <canvas id="humChart"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🎛️ 远程控制</h2>
+    <div class="controls">
+      <div class="ctrl-group">
+        <div class="control-head">
+          <div class="title">💡 智能灯</div>
+          <div class="control-state" id="sLight">当前: --</div>
+        </div>
+        <div class="btn-row">
+          <button id="btnLightOn" class="btn-on" onclick="sendCmd('LightStatus', 1)">开灯</button>
+          <button id="btnLightOff" class="btn-off" onclick="sendCmd('LightStatus', 0)">关灯</button>
+        </div>
+      </div>
+      <div class="ctrl-group">
+        <div class="control-head">
+          <div class="title">🔔 蜂鸣器</div>
+          <div class="control-state" id="sBuzzer">当前: --</div>
+        </div>
+        <div class="btn-row">
+          <button id="btnBuzzerOn" class="btn-on" onclick="sendCmd('BuzzerStatus', 1)">报警</button>
+          <button id="btnBuzzerOff" class="btn-off" onclick="sendCmd('BuzzerStatus', 0)">静音</button>
+        </div>
+      </div>
+      <div class="ctrl-group" id="groupDoorbell">
+        <div class="control-head">
+          <div class="title">🚪 门铃</div>
+          <div class="control-state" id="sDoorbell">状态: 待机</div>
+        </div>
+        <div class="btn-row">
+          <button id="btnDoorbellRing" class="btn-on" onclick="sendCmd('DoorbellStatus', 1)">响门铃</button>
+        </div>
+      </div>
+      <div class="ctrl-group">
+        <div class="control-head">
+          <div class="title">🔌 智能插座</div>
+          <div class="control-state" id="sSocket">当前: --</div>
+        </div>
+        <div class="btn-row">
+          <button id="btnSocketOn" class="btn-on" onclick="sendCmd('SocketStatus', 1)">通电</button>
+          <button id="btnSocketOff" class="btn-off" onclick="sendCmd('SocketStatus', 0)">断电</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>⚙️ Broker 配置</h2>
+    <details>
+      <summary>展开 / 修改连接参数（默认即可使用）</summary>
+      <div class="config-row">
+        <label>WSS 地址</label>
+        <input id="cfgUrl" value="wss://broker.emqx.io:8084/mqtt">
+      </div>
+      <div class="config-row">
+        <label>主题前缀</label>
+        <input id="cfgPrefix" value="homeIoT/6a06e513cbb0">
+      </div>
+      <div class="config-row">
+        <label>&nbsp;</label>
+        <div class="btn-row">
+          <button onclick="connect()">重新连接</button>
+          <button onclick="resetPublicConfig()">恢复公网默认</button>
+          <button class="btn-off" onclick="disconnect()">断开</button>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>📝 通信日志</h2>
+    <div id="log"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+let client = null;
+let stateTopic = '';
+let cmdTopic = '';
+const DEFAULT_MQTT_URL = 'wss://broker.emqx.io:8084/mqtt';
+const DEFAULT_TOPIC_PREFIX = 'homeIoT/6a06e513cbb0';
+const $ = (id) => document.getElementById(id);
+const CONTROL_LABELS = {
+  LightStatus: { name: 'Light', on: '开', off: '关' },
+  BuzzerStatus: { name: 'Buzzer', on: '响', off: '静音' },
+  SocketStatus: { name: 'Socket', on: '通电', off: '断电' },
+};
+
+// —— 温度、空气湿度、土壤 raw 三曲线 ——
+let humChart = null;
+const CHART_MAX_POINTS = 600;  // 600 点 × 200ms = 2 分钟窗口
+const DISPLAY_FRAME_MS = 200;  // 网页插值刷新间隔，让曲线视觉上连续上升
+const tempData = [];
+const humData = [];
+const soilData = [];
+const chartLabels = [];
+let displayReading = null;
+let startReading = null;
+let targetReading = null;
+let readingAnimStart = 0;
+let readingAnimDuration = 1000;
+
+function initChart() {
+  const ctx = document.getElementById('humChart').getContext('2d');
+  humChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: chartLabels,
+      datasets: [
+        {
+          label: '温度 °C',
+          data: tempData,
+          borderColor: '#fb923c',
+          backgroundColor: 'rgba(251,146,60,0.12)',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0,
+          fill: false,
+          yAxisID: 'yTemp',
+        },
+        {
+          label: '湿度 %',
+          data: humData,
+          borderColor: '#22d3ee',
+          backgroundColor: 'rgba(34,211,238,0.15)',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0,
+          fill: true,
+          yAxisID: 'yHum',
+        },
+        {
+          label: '土壤 raw',
+          data: soilData,
+          borderColor: '#4ade80',
+          backgroundColor: 'rgba(74,222,128,0.08)',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0,
+          fill: false,
+          yAxisID: 'ySoilRaw',
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        yTemp: {
+          position: 'left',
+          min: 0, max: 50,
+          ticks: { color: '#fb923c' },
+          grid:  { color: 'rgba(148,163,184,0.1)' },
+          title: { display: true, text: '°C', color: '#fb923c' }
+        },
+        yHum: {
+          position: 'right',
+          min: 0,
+          max: 100,
+          ticks: { color: '#22d3ee' },
+          grid:  { display: false },
+          title: { display: true, text: '%', color: '#22d3ee' }
+        },
+        ySoilRaw: {
+          position: 'right',
+          min: 0,
+          max: 4095,
+          ticks: { color: '#16a34a' },
+          grid:  { display: false },
+          title: { display: true, text: 'raw', color: '#16a34a' }
+        },
+        x: {
+          ticks: { color: '#94a3b8', maxRotation: 0, autoSkipPadding: 24 },
+          grid:  { display: false }
+        }
+      },
+      plugins: {
+        legend: { labels: { color: '#cbd5e1' } }
+      }
+    }
+  });
+}
+
+function lerp(a, b, p) {
+  return a + (b - a) * p;
+}
+
+function setReadingTarget(t, h, soil) {
+  const now = Date.now();
+  const next = { t, h, soil };
+  if (!displayReading) {
+    displayReading = next;
+    startReading = next;
+    targetReading = next;
+    renderReading(next);
+    pushReading(t, h, soil);
+    return;
+  }
+
+  startReading = { ...displayReading };
+  targetReading = next;
+  readingAnimStart = now;
+  readingAnimDuration = 1000;
+}
+
+function animateReading() {
+  if (!startReading || !targetReading) return;
+  const p = Math.min(1, (Date.now() - readingAnimStart) / readingAnimDuration);
+  displayReading = {
+    t: lerp(startReading.t, targetReading.t, p),
+    h: lerp(startReading.h, targetReading.h, p),
+    soil: lerp(startReading.soil, targetReading.soil, p),
+  };
+  renderReading(displayReading);
+  pushReading(displayReading.t, displayReading.h, displayReading.soil);
+}
+
+function renderReading(r) {
+  $('vTemp').textContent = r.t.toFixed(1);
+  $('vHum').textContent = r.h.toFixed(1);
+  $('vSoil').textContent = r.soil.toFixed(0);
+}
+
+function pushReading(t, h, soil) {
+  if (!humChart) return;
+  const label = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  chartLabels.push(label);
+  tempData.push(t);
+  humData.push(h);
+  soilData.push(soil);
+  if (chartLabels.length > CHART_MAX_POINTS) {
+    chartLabels.shift();
+    tempData.shift();
+    humData.shift();
+    soilData.shift();
+  }
+  humChart.update('none');
+}
+
+function log(msg, cls = '') {
+  const t = new Date().toLocaleTimeString();
+  $('log').innerHTML += `<div><span class="log-time">[${t}]</span> <span class="${cls}">${msg}</span></div>`;
+  $('log').scrollTop = $('log').scrollHeight;
+}
+
+function setStatus(on) {
+  const s = $('connStatus');
+  s.textContent = on ? '已连接' : '未连接';
+  s.className = 'pill ' + (on ? 'on' : 'off');
+}
+
+function switchValue(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  const s = String(value).trim().toLowerCase();
+  return ['1', 'true', 'on', 'open', 'yes', '开', '响', '有人', '通电', '报警', '触发'].includes(s);
+}
+
+function setTileState(tileId, on, alertMode = false) {
+  const tile = $(tileId);
+  if (!tile) return;
+  tile.classList.remove('state-on', 'state-off', 'state-alert');
+  tile.classList.add(alertMode && on ? 'state-alert' : (on ? 'state-on' : 'state-off'));
+}
+
+function setDoorbellState(value) {
+  const on = switchValue(value);
+  const state = $('sDoorbell');
+  const group = $('groupDoorbell');
+  const btn = $('btnDoorbellRing');
+  $('vDoorbell').textContent = on ? '响铃' : '待机';
+  setTileState('tileDoorbell', on);
+
+  if (state) {
+    state.className = 'control-state ' + (on ? 'on' : 'off');
+    state.textContent = '状态: ' + (on ? '响铃' : '待机');
+  }
+  if (group) {
+    group.classList.remove('is-on', 'is-off', 'is-pending');
+    group.classList.add(on ? 'is-on' : 'is-off');
+  }
+  if (btn) {
+    btn.classList.remove('pending');
+    btn.classList.toggle('active', on);
+  }
+}
+
+function setButtonSmsState(value) {
+  const on = switchValue(value);
+  $('vButtonSms').textContent = on ? '触发' : '待机';
+  setTileState('tileButtonSms', on, true);
+}
+
+function setControlState(name, value, onLabel, offLabel) {
+  const onBtn = $(`btn${name}On`);
+  const offBtn = $(`btn${name}Off`);
+  const state = $(`s${name}`);
+  if (!onBtn || !offBtn || !state) return;
+  const group = state.closest('.ctrl-group');
+
+  const on = switchValue(value);
+  onBtn.classList.remove('pending');
+  offBtn.classList.remove('pending');
+  onBtn.classList.toggle('active', on);
+  offBtn.classList.toggle('active', !on);
+  state.className = 'control-state ' + (on ? 'on' : 'off');
+  state.textContent = '状态: ' + (on ? onLabel : offLabel);
+  if (group) {
+    group.classList.remove('is-on', 'is-off', 'is-pending');
+    group.classList.add(on ? 'is-on' : 'is-off');
+  }
+}
+
+function markControlPending(key, value) {
+  if (key === 'DoorbellStatus') {
+    const state = $('sDoorbell');
+    const group = $('groupDoorbell');
+    const btn = $('btnDoorbellRing');
+    if (state) {
+      state.className = 'control-state pending';
+      state.textContent = '等待回传: 响铃';
+    }
+    if (group) {
+      group.classList.remove('is-on', 'is-off', 'is-pending');
+      group.classList.add('is-pending');
+    }
+    if (btn) btn.classList.add('pending');
+    return;
+  }
+
+  const cfg = CONTROL_LABELS[key];
+  if (!cfg) return;
+  const onBtn = $(`btn${cfg.name}On`);
+  const offBtn = $(`btn${cfg.name}Off`);
+  const state = $(`s${cfg.name}`);
+  if (!onBtn || !offBtn || !state) return;
+  const group = state.closest('.ctrl-group');
+
+  const on = switchValue(value);
+  onBtn.classList.remove('pending');
+  offBtn.classList.remove('pending');
+  (on ? onBtn : offBtn).classList.add('pending');
+  state.className = 'control-state pending';
+  state.textContent = '等待回传: ' + (on ? cfg.on : cfg.off);
+  if (group) {
+    group.classList.remove('is-on', 'is-off', 'is-pending');
+    group.classList.add('is-pending');
+  }
+}
+
+function connect() {
+  if (client) { client.end(true); }
+  const url = $('cfgUrl').value.trim();
+  const prefix = $('cfgPrefix').value.trim();
+  stateTopic = `${prefix}/state`;
+  cmdTopic = `${prefix}/cmd`;
+
+  localStorage.setItem('cfg_url', url);
+  localStorage.setItem('cfg_prefix', prefix);
+
+  const clientId = 'webDash_' + Math.random().toString(16).slice(2, 10);
+  log(`连接 ${url} (clientId=${clientId})`);
+
+  client = mqtt.connect(url, {
+    clientId, keepalive: 60, clean: true, reconnectPeriod: 5000,
+  });
+
+  client.on('connect', () => {
+    log('MQTT 已连接', 'log-rx');
+    setStatus(true);
+    client.subscribe(stateTopic, (err) => {
+      if (err) log('订阅失败: ' + err, 'log-err');
+      else log('已订阅: ' + stateTopic, 'log-rx');
+    });
+  });
+
+  client.on('message', (topic, payload) => {
+    const msg = payload.toString();
+    log(`RX ${topic} ${msg}`, 'log-rx');
+    try { updateUI(JSON.parse(msg)); }
+    catch (e) { log('解析失败: ' + e.message, 'log-err'); }
+  });
+
+  client.on('error', (err) => log('错误: ' + err.message, 'log-err'));
+  client.on('close', () => { setStatus(false); log('连接关闭'); });
+}
+
+function disconnect() {
+  if (client) { client.end(true); client = null; setStatus(false); log('已主动断开'); }
+}
+
+function isPrivateBrokerUrl(url) {
+  return /(^|\/\/)(localhost|127\.0\.0\.1|0\.0\.0\.0|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(url);
+}
+
+function resetPublicConfig() {
+  $('cfgUrl').value = DEFAULT_MQTT_URL;
+  $('cfgPrefix').value = DEFAULT_TOPIC_PREFIX;
+  localStorage.setItem('cfg_url', DEFAULT_MQTT_URL);
+  localStorage.setItem('cfg_prefix', DEFAULT_TOPIC_PREFIX);
+  connect();
+}
+
+function updateUI(p) {
+  // 温度、空气湿度、土壤 raw 一起到一帧时，设置新目标值；网页端再做线性插值
+  let chartT, chartH, chartSoil;
+  if (p.Temperature !== undefined) {
+    chartT = Number(p.Temperature);
+  }
+  if (p.Humidity !== undefined) {
+    chartH = Number(p.Humidity);
+  }
+  if (p.HumidityAlarm !== undefined) {
+    const on = switchValue(p.HumidityAlarm);
+    $('vHumAlarm').textContent = on ? '报警' : '正常';
+    setTileState('tileHumAlarm', on, true);
+  }
+  if (p.SoilRaw !== undefined) {
+    chartSoil = Number(p.SoilRaw);
+  } else if (p.SoilMoisture !== undefined) {
+    chartSoil = Number(p.SoilMoisture);
+  }
+  if (p.ButtonSmsTrigger !== undefined) {
+    setButtonSmsState(p.ButtonSmsTrigger);
+  }
+  if (chartT !== undefined && chartH !== undefined && chartSoil !== undefined) {
+    setReadingTarget(chartT, chartH, chartSoil);
+  }
+  if (p.MotionStatus  !== undefined) {
+    const on = switchValue(p.MotionStatus);
+    $('vMotion').textContent = on ? '有人' : '无人';
+    setTileState('tileMotion', on);
+  }
+  if (p.LightStatus   !== undefined) {
+    const on = switchValue(p.LightStatus);
+    $('vLight').textContent = on ? '开' : '关';
+    setTileState('tileLight', on);
+    setControlState('Light', p.LightStatus, '开', '关');
+  }
+  if (p.BuzzerStatus  !== undefined) {
+    const on = switchValue(p.BuzzerStatus);
+    $('vBuzzer').textContent = on ? '响' : '静音';
+    setTileState('tileBuzzer', on, true);
+    setControlState('Buzzer', p.BuzzerStatus, '响', '静音');
+  }
+  if (p.DoorbellStatus !== undefined) {
+    setDoorbellState(p.DoorbellStatus);
+  }
+  if (p.SocketStatus  !== undefined) {
+    const on = switchValue(p.SocketStatus);
+    $('vSocket').textContent = on ? '通电' : '断电';
+    setTileState('tileSocket', on);
+    setControlState('Socket', p.SocketStatus, '通电', '断电');
+  }
+  $('lastUpdate').textContent = new Date().toLocaleTimeString();
+}
+
+function sendCmd(key, value) {
+  if (!client || !client.connected) { alert('请先连接 Broker'); return; }
+  const optimistic = { [key]: value };
+  const payload = JSON.stringify(optimistic);
+  updateUI(optimistic);  // 本地立即切状态，设备回传后再校准
+  client.publish(cmdTopic, payload, { qos: 1 });   // QoS=1：网络抖动也不丢
+  log(`TX ${cmdTopic} ${payload}`, 'log-tx');
+}
+
+window.addEventListener('load', () => {
+  initChart();
+  setInterval(animateReading, DISPLAY_FRAME_MS);
+  const url = localStorage.getItem('cfg_url') || DEFAULT_MQTT_URL;
+  const pre = localStorage.getItem('cfg_prefix') || DEFAULT_TOPIC_PREFIX;
+  $('cfgUrl').value = isPrivateBrokerUrl(url) ? DEFAULT_MQTT_URL : url;
+  $('cfgPrefix').value = pre;
+  setTimeout(connect, 200);
+});
+</script>
+</body>
+</html>
